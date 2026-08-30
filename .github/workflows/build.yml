@@ -139,7 +139,10 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      # Runs even when the release step fails, so a bad token or a rate limit
+      # still leaves downloadable installers on the run.
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: TeslaCamPlayer-${{ matrix.name }}
