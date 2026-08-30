@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDashcam Studio</title>
+    <link rel="icon" href="logo.png" type="image/png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="header-title">
+                    <img src="logo.png" alt="Logo" class="header-logo">
+                    <span>TDashcam Studio</span>
+                </div>
+                    <button id="toggleSidebarBtn" class="toggle-sidebar-btn" title="切换侧边栏">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 6h16M4 12h16M4 18h16" stroke="var(--icon-color, white)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+            </div>
+            <div class="filters">
+                <div class="filter-group">
+                    <label for="dateFilter">日期</label>
+                    <div class="date-input-wrapper">
+                        <input type="text" id="dateFilter" placeholder="选择日期">
+                        <button type="button" id="clearDateBtn" class="clear-date-btn" title="清除日期">&times;</button>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label for="eventFilter">事件类型</label>
+                    <select id="eventFilter">
+                        <option value="">所有类型</option>
+                        <option value="RecentClips">最近片段</option>
+                        <option value="SavedClips">保存片段</option>
+                        <option value="SentryClips">哨兵模式</option>
+                    </select>
+                </div>
+            </div>
+            <div id="fileList" class="file-list">
+            </div>
+            <div class="sidebar-footer">
+                <button id="selectFolderBtn">选择文件夹</button>
+                <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
+                <input type="file" id="fileInputIOS" multiple accept="video/mp4,video/*" style="display: none;">
+            </div>
+        </div>
+        <div class="main-content">
+            <header class="main-header">
+                <div class="header-left">
+                    <button id="openSidebarBtn" class="open-sidebar-btn" title="打开侧边栏">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 6h16M4 12h16M4 18h16" stroke="var(--icon-color, white)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="header-center-info">
+                    <div id="headerLocationDisplay" class="header-location"></div>
+                    <div id="realTimeClock" class="real-time-clock">--:--:--</div>
+                </div>
+                <div class="header-right" id="headerRight">
+                    <div class="header-actions-group" id="headerActionsGroup">
+                        <button id="metaSwitchBtn" class="metadata-switch-btn" title="显示/隐藏元数据" disabled>
+                            <span class="btn-icon">🚗</span>
+                            <span class="btn-text" data-i18n="metadata">元数据</span>
+                        </button>
+                        <button id="metaDetailBtn" class="control-btn" title="查看详细元数据" disabled>
+                            <span class="btn-icon">📊</span>
+                            <span class="btn-text" data-i18n="metadataDetail">详细数据</span>
+                        </button>
+                        <button id="exportMetadataBtn" class="control-btn" title="导出元数据CSV" disabled>
+                            <span class="btn-icon">📥</span>
+                            <span class="btn-text" data-i18n="exportMetadata">导出数据</span>
+                        </button>
+                        <button id="revealFileBtn" class="control-btn" title="显示文件路径" disabled>
+                            <span class="btn-icon">📂</span>
+                            <span class="btn-text" data-i18n="revealFile">显示路径</span>
+                        </button>
+                        <button id="downloadFileBtn" class="control-btn" title="下载当前文件" disabled>
+                            <span class="btn-icon">💾</span>
+                            <span class="btn-text" data-i18n="downloadFile">下载视频</span>
+                        </button>
+                        <button id="themeToggleBtn" class="control-btn theme-toggle-btn" title="切换主题">
+                            <span class="btn-icon">🌙</span>
+                            <span class="btn-text" data-i18n="toggleTheme">主题切换</span>
+                        </button>
+                        <button id="langToggleBtn" class="control-btn lang-toggle-btn" title="Switch Language">
+                            <span class="btn-icon">中</span>
+                            <span class="btn-text" data-i18n="toggleLanguage">语言</span>
+                        </button>
+                        <a href="https://github.com/DeaglePC/TDashcamStudio" target="_blank" class="github-link control-btn" title="GitHub">
+                            <span class="btn-icon">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                </svg>
+                            </span>
+                            <span class="btn-text">GitHub</span>
+                        </a>
+                    </div>
+                    <button id="headerMenuBtn" class="header-menu-btn" title="更多选项">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 13a1 1 0 100-2 1 1 0 000 2zM12 6a1 1 0 100-2 1 1 0 000 2zM12 20a1 1 0 100-2 1 1 0 000 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </header>
+            <div id="playerArea" class="player-area empty">
+                <div id="front-container" class="video-container is-main" data-camera="front">
+                    <video id="front-player"></video>
+                    <div class="camera-label">前</div>
+                </div>
+                <div id="back-container" class="video-container is-pip pos-top-right" data-camera="back">
+                    <video id="back-player"></video>
+                    <div class="camera-label">后</div>
+                </div>
+                <div id="left-container" class="video-container is-pip pos-bottom-left" data-camera="left">
+                    <video id="left-player"></video>
+                    <div class="camera-label">左</div>
+                </div>
+                <div id="right-container" class="video-container is-pip pos-bottom-right" data-camera="right">
+                    <video id="right-player"></video>
+                    <div class="camera-label">右</div>
+                </div>
+                <div id="left-pillar-container" class="video-container is-pip hidden" data-camera="left_pillar">
+                    <video id="left-pillar-player"></video>
+                    <div class="camera-label">左柱</div>
+                </div>
+                <div id="right-pillar-container" class="video-container is-pip hidden" data-camera="right_pillar">
+                    <video id="right-pillar-player"></video>
+                    <div class="camera-label">右柱</div>
+                </div>
+
+                <div id="metadataPanel" class="metadata-panel collapsed">
+                    <div class="metadata-content">
+                        <div class="metadata-header">
+                            <span data-i18n="metadata">元数据</span>
+                        </div>
+                        <div class="metadata-body" id="metadataBody">
+                            <div class="metadata-loading" id="metadataLoading" style="display: none;">
+                                <span data-i18n="loadingMetadata">加载中...</span>
+                            </div>
+                            <div class="metadata-empty" id="metadataEmpty">
+                                <span data-i18n="noMetadata">无元数据</span>
+                            </div>
+                            <div class="metadata-items" id="metadataItems" style="display: none;">
+                                <!-- Main Dashboard Row -->
+                                <div class="metadata-dashboard">
+                                    <!-- Left Column: Gear + Brake -->
+                                    <div class="meta-left-col">
+                                        <div class="meta-gear" id="metaGear">P</div>
+                                        <div class="meta-brake-container">
+                                            <svg class="meta-brake-icon" id="metaBrakeIcon" viewBox="0 0 1024 1024" width="22" height="22">
+                                                <!-- Brake pedal - inactive state -->
+                                                <g class="brake-inactive">
+                                                    <path d="M821.394 861.482H200.242c-23.709 0-44.013-20.191-45.124-44.975 0 0-30.555-129.896-30.044-166.228 0.325-23.102 15.23-164.3 15.23-164.3 2.449-27.739 18.019-48.258 42.686-48.258h646.233c24.667 0 44.357 21.769 43.759 48.258l14.579 163.622-22.043 166.906c-0.56 24.784-20.414 44.975-44.124 44.975z m24.716-358.364l0.292-10.498c0.23-8.275-6.452-15.059-14.85-15.059H186.497c-8.397 0-14.828 6.784-14.291 15.059l0.681 10.498c0.534 8.232 7.802 14.954 16.153 14.954h641.472c8.35 0 15.37-6.722 15.598-14.954z m8.739 81.304l0.296-10.264c0.233-8.091-6.628-14.724-15.248-14.724H177.735c-8.62 0-15.226 6.633-14.681 14.724l0.691 10.264c0.542 8.049 7.999 14.622 16.571 14.622H838.84c8.574 0 15.777-6.572 16.009-14.622z m6.172 79.506l0.298-10.038c0.235-7.912-6.747-14.399-15.516-14.399H172.234c-8.769 0-15.494 6.487-14.945 14.399l0.695 10.038c0.545 7.872 8.126 14.3 16.847 14.3h669.91c8.721 0 16.047-6.428 16.28-14.3z m-14.901 77.765l0.282-9.819c0.222-7.74-6.466-14.085-14.863-14.085H186.526c-8.397 0-14.841 6.345-14.322 14.085l0.659 9.819c0.517 7.701 7.772 13.989 16.123 13.989h641.548c8.351 0 15.365-6.288 15.586-13.989z m-8.749 76.081l0.267-9.608c0.21-7.573-6.189-13.781-14.222-13.781H206.385c-8.033 0-14.202 6.208-13.711 13.781l0.623 9.608c0.489 7.535 7.425 13.688 15.415 13.688h613.751c7.99 0.001 14.698-6.152 14.908-13.688z m1.869-378.856l36.038-94.167 21.623-119.775H785.183L752.749 356.56l-118.926 82.358H839.24z" fill="rgba(255,255,255,0.3)"/>
+                                                </g>
+                                                <!-- Active state -->
+                                                <g class="brake-active">
+                                                    <path d="M821.394 861.482H200.242c-23.709 0-44.013-20.191-45.124-44.975 0 0-30.555-129.896-30.044-166.228 0.325-23.102 15.23-164.3 15.23-164.3 2.449-27.739 18.019-48.258 42.686-48.258h646.233c24.667 0 44.357 21.769 43.759 48.258l14.579 163.622-22.043 166.906c-0.56 24.784-20.414 44.975-44.124 44.975z m24.716-358.364l0.292-10.498c0.23-8.275-6.452-15.059-14.85-15.059H186.497c-8.397 0-14.828 6.784-14.291 15.059l0.681 10.498c0.534 8.232 7.802 14.954 16.153 14.954h641.472c8.35 0 15.37-6.722 15.598-14.954z m8.739 81.304l0.296-10.264c0.233-8.091-6.628-14.724-15.248-14.724H177.735c-8.62 0-15.226 6.633-14.681 14.724l0.691 10.264c0.542 8.049 7.999 14.622 16.571 14.622H838.84c8.574 0 15.777-6.572 16.009-14.622z m6.172 79.506l0.298-10.038c0.235-7.912-6.747-14.399-15.516-14.399H172.234c-8.769 0-15.494 6.487-14.945 14.399l0.695 10.038c0.545 7.872 8.126 14.3 16.847 14.3h669.91c8.721 0 16.047-6.428 16.28-14.3z m-14.901 77.765l0.282-9.819c0.222-7.74-6.466-14.085-14.863-14.085H186.526c-8.397 0-14.841 6.345-14.322 14.085l0.659 9.819c0.517 7.701 7.772 13.989 16.123 13.989h641.548c8.351 0 15.365-6.288 15.586-13.989z m-8.749 76.081l0.267-9.608c0.21-7.573-6.189-13.781-14.222-13.781H206.385c-8.033 0-14.202 6.208-13.711 13.781l0.623 9.608c0.489 7.535 7.425 13.688 15.415 13.688h613.751c7.99 0.001 14.698-6.152 14.908-13.688z m1.869-378.856l36.038-94.167 21.623-119.775H785.183L752.749 356.56l-118.926 82.358H839.24z" fill="#ff4d4f"/>
+                                                </g>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Left Blinker -->
+                                    <div class="meta-blinker meta-blinker-left" id="metaBlinkerLeft">
+                                        <svg viewBox="0 0 48 48" width="18" height="18">
+                                            <path class="blinker-outline" d="M20 8 L6 24 L20 40 L20 30 L42 30 L42 18 L20 18 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+                                            <path class="blinker-fill" d="M20 8 L6 24 L20 40 L20 30 L42 30 L42 18 L20 18 Z" fill="#52c41a" stroke="none" opacity="0"/>
+                                        </svg>
+                                    </div>
+                                    
+                                    <!-- Center: Speed -->
+                                    <div class="meta-speed-container">
+                                        <span class="meta-speed-value" id="metaSpeed">0</span>
+                                        <span class="meta-speed-unit">km/h</span>
+                                    </div>
+                                    
+                                    <!-- Right Blinker -->
+                                    <div class="meta-blinker meta-blinker-right" id="metaBlinkerRight">
+                                        <svg viewBox="0 0 48 48" width="18" height="18">
+                                            <path class="blinker-outline" d="M28 8 L42 24 L28 40 L28 30 L6 30 L6 18 L28 18 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+                                            <path class="blinker-fill" d="M28 8 L42 24 L28 40 L28 30 L6 30 L6 18 L28 18 Z" fill="#52c41a" stroke="none" opacity="0"/>
+                                        </svg>
+                                    </div>
+                                    
+                                    <!-- Right Column: Steering + Accelerator -->
+                                    <div class="meta-right-col">
+                                        <div class="meta-steering-container" id="metaSteeringContainer">
+                                            <svg class="meta-steering-icon" id="metaSteeringIcon" viewBox="0 0 64 64" width="18" height="18">
+                                                <!-- Outer ring -->
+                                                <circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="5"/>
+                                                <!-- Inner hub circle -->
+                                                <circle cx="32" cy="32" r="9" fill="rgba(255,255,255,0.9)"/>
+                                                <!-- Three spokes -->
+                                                <!-- Left spoke -->
+                                                <rect x="4" y="28" width="19" height="8" rx="2" fill="rgba(255,255,255,0.9)"/>
+                                                <!-- Right spoke -->
+                                                <rect x="41" y="28" width="19" height="8" rx="2" fill="rgba(255,255,255,0.9)"/>
+                                                <!-- Bottom spoke -->
+                                                <rect x="28" y="41" width="8" height="19" rx="2" fill="rgba(255,255,255,0.9)"/>
+                                            </svg>
+                                            <span class="meta-steering-value" id="metaSteering">0°</span>
+                                        </div>
+                                        <div class="meta-accelerator-container">
+                                            <svg class="meta-accelerator-icon" id="metaAcceleratorIcon" viewBox="0 0 32 32" width="22" height="22">
+                                                <!-- Base gray pedal (always visible) -->
+                                                <rect x="8" y="4" width="16" height="24" rx="3" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+                                                <!-- Lightning bolt icon -->
+                                                <path d="M18 8 L13 16 L16 16 L14 24 L19 15 L16 15 L18 8 Z" fill="rgba(255,255,255,0.4)"/>
+                                                <!-- Active fill overlay - grows from bottom -->
+                                                <rect id="accelFillRect" x="10" y="26" width="12" height="0" rx="2" fill="#73d13d" opacity="0"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Secondary Info Row -->
+                                <div class="metadata-secondary">
+                                    <div class="metadata-item">
+                                        <span class="metadata-label" data-i18n="autopilot">自动驾驶</span>
+                                        <span class="metadata-value" id="metaAutopilot">--</span>
+                                    </div>
+                                    <div class="metadata-item">
+                                        <span class="metadata-label" data-i18n="gps">GPS</span>
+                                        <span class="metadata-value" id="metaGPS">--</span>
+                                    </div>
+                                    <div class="metadata-item">
+                                        <span class="metadata-label" data-i18n="heading">航向</span>
+                                        <span class="metadata-value" id="metaHeading">--</span>
+                                    </div>
+                                    <div class="metadata-item">
+                                        <span class="metadata-label" data-i18n="acceleration">加速度</span>
+                                        <span class="metadata-value" id="metaAcceleration">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="videoControlsOverlay" class="video-controls-overlay">
+                    <div class="video-controls-container">
+                        <div id="speedGraphContainer" class="speed-graph-container">
+                            <canvas id="speedGraphCanvas" class="speed-graph-canvas"></canvas>
+                        </div>
+                        <div id="clipToolbar" class="clip-toolbar" style="display: none;">
+                            <div class="clip-edge-group">
+                                <span class="clip-edge-label clip-edge-label-start" data-i18n-text="clipInPoint">起点</span>
+                                <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="-1" data-i18n-title="clipNudgeMinus1">-1s</button>
+                                <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="-0.1" data-i18n-title="clipNudgeMinus01">-.1</button>
+                                <span class="clip-time-field">
+                                    <input type="text" id="clipStartInput" class="clip-time-input" spellcheck="false" autocomplete="off">
+                                    <span class="clip-time-sub" id="clipStartSub">00:00.0</span>
+                                </span>
+                                <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="0.1" data-i18n-title="clipNudgePlus01">+.1</button>
+                                <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="1" data-i18n-title="clipNudgePlus1">+1s</button>
+                                <button type="button" class="clip-mark-btn" data-edge="start" data-i18n-text="clipMarkIn" data-i18n-title="clipMarkInTitle">当前位置 (I)</button>
+                            </div>
+                            <div class="clip-edge-group">
+                                <span class="clip-edge-label clip-edge-label-end" data-i18n-text="clipOutPoint">终点</span>
+                                <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="-1" data-i18n-title="clipNudgeMinus1">-1s</button>
+                                <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="-0.1" data-i18n-title="clipNudgeMinus01">-.1</button>
+                                <span class="clip-time-field">
+                                    <input type="text" id="clipEndInput" class="clip-time-input" spellcheck="false" autocomplete="off">
+                                    <span class="clip-time-sub" id="clipEndSub">00:00.0</span>
+                                </span>
+                                <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="0.1" data-i18n-title="clipNudgePlus01">+.1</button>
+                                <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="1" data-i18n-title="clipNudgePlus1">+1s</button>
+                                <button type="button" class="clip-mark-btn" data-edge="end" data-i18n-text="clipMarkOut" data-i18n-title="clipMarkOutTitle">当前位置 (O)</button>
+                            </div>
+                            <div class="clip-edge-group clip-duration-group">
+                                <span class="clip-edge-label" data-i18n-text="clipLengthLabel">时长</span>
+                                <span id="clipToolbarDuration" class="clip-duration-value">00:00.0</span>
+                                <button type="button" id="clipPreviewBtn" class="clip-mark-btn" data-i18n-text="clipPreviewRange" data-i18n-title="clipPreviewRangeTitle">预览选段</button>
+                            </div>
+                            <div class="clip-hint" id="clipHint" data-i18n-text="clipHint"></div>
+                        </div>
+                        <div id="progressContainer" class="progress-container">
+                            <div class="progress-track">
+                                <div id="progressPlayed" class="progress-played"></div>
+                                <div id="clipSelection" class="clip-selection"></div>
+                            </div>
+                            <div id="progressHandle" class="progress-handle"></div>
+                            <div id="clipStartHandle" class="clip-handle clip-start-handle"><span class="clip-handle-time"></span></div>
+                            <div id="clipEndHandle" class="clip-handle clip-end-handle"><span class="clip-handle-time"></span></div>
+                            <div id="timePreview" class="time-preview">
+                                <div class="time-preview-time">00:00</div>
+                            </div>
+                        </div>
+                        <div class="controls-section-wrapper">
+                            <div class="controls-section">
+                                <div class="controls-left">
+                                    <button id="playPauseBtn" class="control-btn">
+                                        <img id="playPauseIcon" src="assets/icons/play.svg" alt="播放">
+                                    </button>
+                                    <div id="videoTimeDisplay" class="video-time-display">00:00 / --:--</div>
+                                </div>
+                                <div id="viewSwitcher" class="view-switcher">
+                                <button class="view-btn" data-view="grid">
+                                    <div class="view-icon grid-icon"></div>
+                                    <span data-i18n="grid6">6-Grid</span>
+                                </button>
+                                <button class="view-btn" data-view="grid4">
+                                    <div class="view-icon grid4-icon"></div>
+                                    <span data-i18n="grid4">4-Grid</span>
+                                </button>
+                                <button class="view-btn" data-view="legacy">
+                                    <div class="view-icon legacy-icon"></div>
+                                    <span data-i18n="legacy">PIP</span>
+                                </button>
+                                <div class="vs-separator"></div>
+                                <button class="view-btn active" data-view="front">
+                                    <div class="view-icon front-icon"></div>
+                                    <span data-i18n="front">Front</span>
+                                </button>
+                                <button class="view-btn" data-view="back">
+                                    <div class="view-icon back-icon"></div>
+                                    <span data-i18n="back">Rear</span>
+                                </button>
+                                <button class="view-btn" data-view="left">
+                                    <div class="view-icon left-icon"></div>
+                                    <span data-i18n="left">Left</span>
+                                </button>
+                                <button class="view-btn" data-view="right">
+                                    <div class="view-icon right-icon"></div>
+                                    <span data-i18n="right">Right</span>
+                                </button>
+                                <button class="view-btn" data-view="left_pillar">
+                                    <div class="view-icon left-pillar-icon"></div>
+                                    <span data-i18n="leftPillar">Left Pillar</span>
+                                </button>
+                                <button class="view-btn" data-view="right_pillar">
+                                    <div class="view-icon right-pillar-icon"></div>
+                                    <span data-i18n="rightPillar">Right Pillar</span>
+                                </button>
+                            </div>
+                            <div class="controls-right">
+                                <button id="clipBtn" class="control-btn clip-btn" title="剪辑视频" disabled>
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                                        <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="2"/>
+                                        <circle cx="6" cy="18" r="2" stroke="currentColor" stroke-width="2"/>
+                                        <path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <button id="confirmClipBtn" class="control-btn confirm-clip-btn" title="确认剪辑范围" style="display: none;">
+                                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+                                        <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </button>
+                                <div id="speedControl" class="speed-control">
+                                    <button id="speedBtn" class="control-btn speed-btn">1x</button>
+                                    <div class="speed-options">
+                                        <div data-speed="2.0">2.0x</div>
+                                        <div data-speed="1.5">1.5x</div>
+                                        <div data-speed="1.0" class="active">1.0x</div>
+                                        <div data-speed="0.5">0.5x</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <div id="overlay" class="overlay"></div>
+    </div>
+
+    <!-- Map Selection Modal -->
+    <div id="mapModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h4 id="mapModalTitle">在地图上查看</h4>
+            <div class="modal-buttons">
+                <button id="gaodeMapBtn" class="map-btn gaode"></button>
+                <button id="googleMapBtn" class="map-btn google"></button>
+            </div>
+            <button id="closeModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+    </div>
+
+    <!-- Clip Export Modal -->
+    <div id="clipModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content clip-modal">
+            <h4 id="clipModalTitle">导出视频片段</h4>
+            <div id="clipInfo" class="clip-info">
+                <div class="clip-info-item">
+                    <span class="clip-info-label">起始时间:</span>
+                    <span class="clip-info-editable">
+                        <input type="text" id="clipStartTime" class="clip-time-input clip-modal-time-input" spellcheck="false" autocomplete="off">
+                        <span class="clip-modal-stepper">
+                            <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="-1" data-i18n-title="clipNudgeMinus1">-1s</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="-0.1" data-i18n-title="clipNudgeMinus01">-.1</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="0.1" data-i18n-title="clipNudgePlus01">+.1</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="start" data-delta="1" data-i18n-title="clipNudgePlus1">+1s</button>
+                        </span>
+                    </span>
+                </div>
+                <div class="clip-info-item">
+                    <span class="clip-info-label">结束时间:</span>
+                    <span class="clip-info-editable">
+                        <input type="text" id="clipEndTime" class="clip-time-input clip-modal-time-input" spellcheck="false" autocomplete="off">
+                        <span class="clip-modal-stepper">
+                            <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="-1" data-i18n-title="clipNudgeMinus1">-1s</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="-0.1" data-i18n-title="clipNudgeMinus01">-.1</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="0.1" data-i18n-title="clipNudgePlus01">+.1</button>
+                            <button type="button" class="clip-nudge-btn" data-edge="end" data-delta="1" data-i18n-title="clipNudgePlus1">+1s</button>
+                        </span>
+                    </span>
+                </div>
+                <div class="clip-info-item">
+                    <span class="clip-info-label">选中时长:</span>
+                    <span id="clipDuration">00:00</span>
+                </div>
+                <div class="clip-info-hint" id="clipModalHint"></div>
+            </div>
+            <div id="clipOptions" class="clip-options">
+                <div class="clip-option-group">
+                    <label id="selectCamerasLabel">选择摄像头:</label>
+                    <div class="camera-checkboxes">
+                        <label><input type="checkbox" id="exportFront" checked> <span data-i18n="front">前</span></label>
+                        <label><input type="checkbox" id="exportBack"> <span data-i18n="back">后</span></label>
+                        <label><input type="checkbox" id="exportLeft"> <span data-i18n="left">左</span></label>
+                        <label><input type="checkbox" id="exportRight"> <span data-i18n="right">右</span></label>
+                        <label><input type="checkbox" id="exportLeftPillar"> <span data-i18n="leftPillar">左柱</span></label>
+                        <label><input type="checkbox" id="exportRightPillar"> <span data-i18n="rightPillar">右柱</span></label>
+                    </div>
+                </div>
+                <div class="clip-option-row">
+                    <label class="clip-checkbox-label"><input type="checkbox" id="addTimestamp" checked> <span id="addTimestampLabel">添加时间水印</span></label>
+                    <label class="clip-checkbox-label"><input type="checkbox" id="addMetadata"> <span id="addMetadataLabel">添加行驶数据</span></label>
+                </div>
+                <div class="clip-option-row">
+                    <label class="clip-checkbox-label"><input type="checkbox" id="mergeVideos"> <span id="mergeVideosLabel">合成四宫格视频</span></label>
+                </div>
+                <div class="clip-option-row" id="ffmpegOptionRow" style="margin-top: 8px; display: none;">
+                     <label class="clip-checkbox-label" title="使用本地 FFmpeg 极速导出（需要系统已安装 FFmpeg）"><input type="checkbox" id="useLocalFFmpeg" checked> <span id="useLocalFFmpegLabel">使用 FFmpeg 极速导出</span></label>
+                </div>
+            </div>
+            <div id="clipProgress" class="clip-progress" style="display: none;">
+                <div class="progress-bar">
+                    <div id="clipProgressBar" class="progress-bar-fill"></div>
+                </div>
+                <div id="clipProgressText" class="progress-text">准备中...</div>
+            </div>
+            <div id="downloadButtons" class="download-buttons" style="display: none;">
+                <!-- Buttons will be injected here -->
+            </div>
+            <div class="modal-buttons">
+                <button id="startClipBtn" class="map-btn gaode">开始导出</button>
+                <button id="cancelClipBtn" class="map-btn" style="background-color: #6c757d;">取消</button>
+            </div>
+            <button id="closeClipModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+    </div>
+
+    <!-- File Path Modal -->
+    <div id="filePathModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content file-path-modal">
+            <h4 id="filePathModalTitle">当前视频文件路径</h4>
+            <div class="file-path-container">
+                <input type="text" id="filePathInput" class="file-path-input" readonly>
+                <button id="copyPathBtn" class="copy-path-btn" title="复制路径">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                        <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/>
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="copySuccessHint" class="copy-success-hint">已复制到剪贴板</div>
+            <button id="closeFilePathModalBtn" class="close-modal-btn">&times;</button>
+        </div>
+    </div>
+
+    <!-- Metadata Detail Overlay (YouTube Stats style) -->
+    <div id="metaDetailOverlay" class="stats-overlay">
+        <div class="stats-header">
+            <span class="stats-title" id="statsTitle">Drive Stats</span>
+            <button id="closeStatsBtn" class="stats-close">[X]</button>
+        </div>
+        <div class="stats-content">
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="speed">Speed</span>
+                <span class="stats-value" id="statsSpeed">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="gear">Gear</span>
+                <span class="stats-value" id="statsGear">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="steering">Steering</span>
+                <span class="stats-value" id="statsSteering">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="accelerator">Accelerator</span>
+                <span class="stats-value" id="statsAccelerator">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="brake">Brake</span>
+                <span class="stats-value" id="statsBrake">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="blinker">Blinker</span>
+                <span class="stats-value" id="statsBlinker">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="autopilot">Autopilot</span>
+                <span class="stats-value" id="statsAutopilot">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="gps">GPS</span>
+                <span class="stats-value" id="statsGPS">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="heading">Heading</span>
+                <span class="stats-value" id="statsHeading">--</span>
+            </div>
+            <div class="stats-row">
+                <span class="stats-label" data-i18n="acceleration">Acceleration</span>
+                <span class="stats-value" id="statsAccel">--</span>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+    <script src="vendor/protobuf.min.js"></script>
+    <script src="dashcam-mp4.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

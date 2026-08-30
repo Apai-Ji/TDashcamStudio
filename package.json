@@ -1,0 +1,18 @@
+{
+  "name": "tdashcam-studio",
+  "version": "1.0.0",
+  "description": "TDashcam Studio - Multi-camera synchronized tesla dashcam playback",
+  "private": true,
+  "scripts": {
+    "tauri": "npx tauri",
+    "tauri:dev": "npx tauri dev",
+    "tauri:build": "npx tauri build",
+    "serve": "npx http-server src -p 8188 -c-1",
+    "inject:umami": "node scripts/inject-umami.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  },
+  "author": "",
+  "license": "AGPL-3.0"
+}

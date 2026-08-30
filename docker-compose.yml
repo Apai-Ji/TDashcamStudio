@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  tdashcam-studio:
+    image: dupengcheng66666/tdashcam-studio:latest
+    container_name: tdashcam-studio
+    ports:
+      - "8188:80"
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - UMAMI_SCRIPT_URL=${UMAMI_SCRIPT_URL:-}
+      - UMAMI_WEBSITE_ID=${UMAMI_WEBSITE_ID:-}
+    networks:
+      - tdashcam-network
+
+networks:
+  tdashcam-network:
+    driver: bridge
