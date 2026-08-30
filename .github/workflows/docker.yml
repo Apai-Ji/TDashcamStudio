@@ -1,8 +1,11 @@
 name: Build and Push Docker Image
 on:
-  push:
-    #branches: [ main ]
-    tags: [ 'v*' ]
+  # Disabled in this fork: the image name and DOCKER_* secrets below belong to
+  # upstream (DeaglePC). Point `images:` at your own namespace and add the
+  # secrets before re-enabling the tag trigger.
+  workflow_dispatch:
+  # push:
+  #   tags: [ 'v*' ]
 
 jobs:
   build:
