@@ -4,6 +4,12 @@
         headerTitle: "TDashcam Studio",
         toggleSidebar: "Toggle Sidebar",
         toggleTheme: "Toggle Theme",
+        decodeSoftware: "SW decode",
+        decodeHardware: "HW decode",
+        decodeToggleTitle: "Video decoding: {mode}. Click to switch - the app restarts.",
+        decodeConfirmToHardware: "Switch to hardware (GPU) decoding? Uses less CPU, but on some GPUs the front camera can freeze. The app will restart.",
+        decodeConfirmToSoftware: "Switch to software (CPU) decoding? Avoids GPU decoder freezes, uses more CPU. The app will restart.",
+        decodeSwitchFailed: "Could not save the decoding setting",
         toggleLanguage: "切换到中文",
         drivingRecords: "Driving Records",
         date: "Date",
@@ -130,6 +136,12 @@
         headerTitle: "TDashcam Studio",
         toggleSidebar: "切换侧边栏",
         toggleTheme: "切换主题",
+        decodeSoftware: "软解",
+        decodeHardware: "硬解",
+        decodeToggleTitle: "视频解码：{mode}。点击切换，程序会自动重启",
+        decodeConfirmToHardware: "切换到硬件（显卡）解码？CPU 占用更低，但部分显卡上前视画面会卡住不动。程序将重启。",
+        decodeConfirmToSoftware: "切换到软件（CPU）解码？避免显卡解码卡死，CPU 占用更高。程序将重启。",
+        decodeSwitchFailed: "解码设置保存失败",
         toggleLanguage: "Switch to English",
         drivingRecords: "行车记录",
         date: "日期",
@@ -279,8 +291,25 @@ async function getTempDir() {
     return '/tmp';
 }
 
+// Local video server started by the desktop app (see src-tauri/src/media_server.rs). Streams
+// files far faster than the asset protocol, which cannot keep six cameras fed from a USB drive.
+let mediaBaseUrl = null;
+
+async function initMediaServer() {
+    const tauri = getTauri();
+    if (!tauri || !tauri.core || !tauri.core.invoke) return;
+    try {
+        mediaBaseUrl = await tauri.core.invoke('get_media_base_url');
+    } catch (e) {
+        console.warn('[initMediaServer] Local video server unavailable, using asset protocol:', e);
+    }
+}
+
 function getFileUrl(file) {
     const tauri = getTauri();
+    if (tauri && file.path && mediaBaseUrl) {
+        return mediaBaseUrl + encodeURIComponent(file.path);
+    }
     if (tauri && file.path) {
         // Tauri 2: use core.convertFileSrc
         let convertFn = null;
@@ -356,6 +385,15 @@ class TauriFile {
     async arrayBuffer() {
         const tauri = getTauri();
         if (!tauri) throw new Error("Tauri API not found");
+        if (mediaBaseUrl) {
+            // Over the local server instead of IPC: a front camera file is ~80 MB
+            try {
+                const response = await fetch(getFileUrl(this));
+                if (response.ok) return await response.arrayBuffer();
+            } catch (e) {
+                console.warn('[TauriFile] Local server read failed, falling back to IPC:', e);
+            }
+        }
         const binary = await tauri.fs.readFile(this.path);
         return binary.buffer;
     }
@@ -2384,9 +2422,125 @@ class MultiCameraPlayer {
         this.isSeeking = false;
         this.playbackRate = 1.0;
         this.lastSyncTime = 0;
-        
+
+        // A second, hidden <video> per camera that loads the next segment ahead of time, so
+        // crossing into it is a swap instead of tearing down and reopening six decoders
+        this.standby = {};
+        this.standbyUrls = {};
+        this.standbySegment = null;
+        this.metadataToken = 0;
+        this.createStandbyPlayers();
+
         // Start label loop
         this.startRenderLoop();
+    }
+
+    createStandbyPlayers() {
+        Object.keys(this.players).forEach(camera => {
+            const current = this.players[camera];
+            if (!current) return;
+            const spare = document.createElement('video');
+            spare.className = 'standby-player';
+            spare.preload = 'auto';
+            spare.muted = current.muted;
+            current.insertAdjacentElement('afterend', spare);
+            this.standby[camera] = spare;
+        });
+    }
+
+    /**
+     * Listen on whichever <video> currently shows `camera`. The element behind a camera
+     * changes every time a preloaded segment is swapped in, so listeners go on both.
+     */
+    onActive(camera, type, handler) {
+        const wrapped = (e) => { if (e.target === this.players[camera]) handler(e); };
+        [this.players[camera], this.standby[camera]].forEach(el => {
+            if (el) el.addEventListener(type, wrapped);
+        });
+    }
+
+    preloadSegment(segment, index) {
+        if (this.standbySegment === index) return;
+        this.clearStandby();
+        this.standbySegment = index;
+        Object.keys(this.standby).forEach(camera => {
+            const file = segment.files[camera];
+            const spare = this.standby[camera];
+            if (!file || !spare) return;
+            this.standbyUrls[camera] = getFileUrl(file);
+            spare.src = this.standbyUrls[camera];
+            spare.load();
+        });
+    }
+
+    clearStandby() {
+        this.standbySegment = null;
+        Object.keys(this.standby).forEach(camera => {
+            const spare = this.standby[camera];
+            if (spare && spare.getAttribute('src')) {
+                spare.pause();
+                spare.removeAttribute('src');
+                spare.load();
+            }
+            if (this.standbyUrls[camera]) {
+                URL.revokeObjectURL(this.standbyUrls[camera]);
+                this.standbyUrls[camera] = null;
+            }
+        });
+    }
+
+    // Bring the preloaded segment on screen. The caller starts playback.
+    async swapToStandby(segment) {
+        const cameras = Object.keys(this.players);
+
+        // Normally everything is buffered by now; only wait for a camera that is not
+        await Promise.all(cameras.map(camera => new Promise(resolve => {
+            const spare = this.standby[camera];
+            if (!segment.files[camera] || !spare || spare.readyState >= 2) return resolve();
+            spare.addEventListener('loadeddata', resolve, { once: true });
+            spare.addEventListener('error', resolve, { once: true });
+        })));
+
+        cameras.forEach(camera => {
+            const current = this.players[camera];
+            const spare = this.standby[camera];
+            const cameraView = this.playerContainers[camera];
+            if (!current || !spare) return;
+
+            if (segment.files[camera]) {
+                spare.defaultPlaybackRate = this.playbackRate;
+                spare.playbackRate = this.playbackRate;
+                spare.classList.remove('standby-player');
+                current.classList.add('standby-player');
+                this.players[camera] = spare;
+                this.standby[camera] = current;
+                const url = this.currentUrls[camera];
+                this.currentUrls[camera] = this.standbyUrls[camera];
+                this.standbyUrls[camera] = url;
+                if (cameraView) cameraView.classList.remove('error', 'empty');
+            } else {
+                // This camera has no file in the new segment
+                current.pause();
+                current.removeAttribute('src');
+                current.load();
+                if (cameraView) cameraView.classList.add('empty');
+            }
+        });
+        // Release the previous segment's elements (now the standby set)
+        this.clearStandby();
+
+        // Metadata parsing reads the whole front file - keep it off the moment of the switch
+        const manager = window.viewer && window.viewer.metadataManager;
+        const token = ++this.metadataToken;
+        if (manager) {
+            manager.clear();
+            if (segment.files['front']) {
+                // Dropped if the user seeks elsewhere before it runs
+                setTimeout(() => {
+                    if (token === this.metadataToken) manager.loadMetadata(segment.files['front']);
+                }, 1500);
+            }
+        }
     }
     
     // Start render loop for labels
@@ -2583,6 +2737,7 @@ class MultiCameraPlayer {
         
         await this.waitForAllVideosLoaded();
 
+        this.metadataToken++;
         // Load SEI metadata from front camera
         if (segment.files['front'] && window.viewer && window.viewer.metadataManager) {
             window.viewer.metadataManager.loadMetadata(segment.files['front']);
@@ -2650,6 +2805,7 @@ class MultiCameraPlayer {
 
     cleanup() {
         this.pauseAll();
+        this.clearStandby();
         Object.values(this.players).forEach(player => {
             player.src = '';
             player.removeAttribute('src');
@@ -2665,7 +2821,7 @@ class MultiCameraPlayer {
 
     setPlaybackRate(rate) {
         this.playbackRate = rate;
-        Object.values(this.players).forEach(p => {
+        [...Object.values(this.players), ...Object.values(this.standby)].forEach(p => {
             if (p) {
                 p.defaultPlaybackRate = rate;
                 p.playbackRate = rate;
@@ -2683,14 +2839,30 @@ class ContinuousVideoPlayer {
         this.segmentDurations = [];
         this.segmentStartTimes = [];
         this.isTransitioning = false;
+        this.PRELOAD_LEAD_SECONDS = 8;
         this.bindEvents();
     }
 
     bindEvents() {
-        const refPlayer = this.multiCameraPlayer.players.front;
-        if (!refPlayer) return;
-        refPlayer.addEventListener('ended', () => { if (!this.isTransitioning) this.playNextSegment(); });
-        refPlayer.addEventListener('timeupdate', () => this.multiCameraPlayer.syncAllPlayers());
+        const mp = this.multiCameraPlayer;
+        if (!mp.players.front) return;
+        mp.onActive('front', 'ended', () => { if (!this.isTransitioning) this.playNextSegment(); });
+        mp.onActive('front', 'timeupdate', () => {
+            mp.syncAllPlayers();
+            this.preloadNextSegmentIfNear();
+        });
+    }
+
+    // Start loading the next segment into the standby players while this one finishes
+    preloadNextSegmentIfNear() {
+        if (!this.currentEvent || this.isTransitioning) return;
+        const nextIndex = this.currentSegmentIndex + 1;
+        if (nextIndex >= this.currentEvent.segments.length) return;
+        const front = this.multiCameraPlayer.players.front;
+        if (!front || !isFinite(front.duration)) return;
+        if (front.duration - front.currentTime <= this.PRELOAD_LEAD_SECONDS) {
+            this.multiCameraPlayer.preloadSegment(this.currentEvent.segments[nextIndex], nextIndex);
+        }
     }
 
     async calculateEventDurations(event) {
@@ -2757,7 +2929,13 @@ class ContinuousVideoPlayer {
     async playNextSegment() {
         if (this.currentSegmentIndex < this.currentEvent.segments.length - 1) {
             this.isTransitioning = true;
-            await this.loadSegment(this.currentSegmentIndex + 1);
+            const nextIndex = this.currentSegmentIndex + 1;
+            if (this.multiCameraPlayer.standbySegment === nextIndex) {
+                this.currentSegmentIndex = nextIndex;
+                await this.multiCameraPlayer.swapToStandby(this.currentEvent.segments[nextIndex]);
+            } else {
+                await this.loadSegment(nextIndex);
+            }
             await this.multiCameraPlayer.playAll();
             this.isTransitioning = false;
         } else {
@@ -2981,11 +3159,11 @@ class ModernVideoControls {
         ].forEach(pair => this.bindClipTimeInput(pair[0], pair[1]));
 
         if (this.player) {
-            this.player.addEventListener('timeupdate', () => {
+            this.multiCameraPlayer.onActive('front', 'timeupdate', () => {
                 if (!this.isDragging) this.updateProgress();
             });
-            this.player.addEventListener('play', () => this.updatePlayState(true));
-            this.player.addEventListener('pause', () => this.updatePlayState(false));
+            this.multiCameraPlayer.onActive('front', 'play', () => this.updatePlayState(true));
+            this.multiCameraPlayer.onActive('front', 'pause', () => this.updatePlayState(false));
         }
 
         if (this.container) {
@@ -7823,6 +8001,7 @@ class TeslaCamViewer {
             playerArea: document.getElementById('playerArea'),
             overlay: document.getElementById('overlay'),
             themeToggleBtn: document.getElementById('themeToggleBtn'),
+            decodeToggleBtn: document.getElementById('decodeToggleBtn'),
             langToggleBtn: document.getElementById('langToggleBtn'),
             mapModal: document.getElementById('mapModal'),
             mapModalTitle: document.getElementById('mapModalTitle'),
@@ -7879,7 +8058,50 @@ class TeslaCamViewer {
         this.initializeFlatpickr();
         this.loadTheme();
         this.loadLanguage();
-        this.loadLastTeslaCamPath();
+        this.initDecodeToggle();
+        initMediaServer().then(() => this.loadLastTeslaCamPath());
+    }
+
+    // Hardware / software video decoding switch (desktop app only)
+    async initDecodeToggle() {
+        const btn = this.dom.decodeToggleBtn;
+        const tauri = getTauri();
+        if (!btn || !tauri || !tauri.core || !tauri.core.invoke) return;
+        try {
+            this.hardwareDecode = await tauri.core.invoke('get_hardware_decode');
+        } catch (e) {
+            return;
+        }
+        btn.style.display = '';
+        btn.addEventListener('click', () => this.toggleHardwareDecode());
+        this.updateDecodeButton();
+    }
+
+    updateDecodeButton() {
+        const btn = this.dom.decodeToggleBtn;
+        if (!btn || this.hardwareDecode === undefined) return;
+        const translations = i18n[this.currentLanguage];
+        const mode = this.hardwareDecode ? translations.decodeHardware : translations.decodeSoftware;
+        const text = btn.querySelector('.btn-text');
+        if (text) text.textContent = mode;
+        btn.title = translations.decodeToggleTitle.replace('{mode}', mode);
+    }
+
+    async toggleHardwareDecode() {
+        const tauri = getTauri();
+        const translations = i18n[this.currentLanguage];
+        const next = !this.hardwareDecode;
+        const message = next ? translations.decodeConfirmToHardware : translations.decodeConfirmToSoftware;
+        const confirmed = tauri.dialog && tauri.dialog.ask
+            ? await tauri.dialog.ask(message, { title: 'TDashcam Studio', kind: 'warning' })
+            : window.confirm(message);
+        if (!confirmed) return;
+        try {
+            // Saves the setting and restarts the app
+            await tauri.core.invoke('set_hardware_decode', { enabled: next });
+        } catch (e) {
+            this.showToast(`${translations.decodeSwitchFailed}: ${e}`, 'error', 4000);
+        }
     }
 
     // 清理旧数据，释放内存
@@ -9463,6 +9685,7 @@ class TeslaCamViewer {
         
         this.dom.langToggleBtn.title = translations.toggleLanguage;
         this.dom.themeToggleBtn.title = translations.toggleTheme;
+        this.updateDecodeButton();
         this.dom.toggleSidebarBtn.title = translations.toggleSidebar;
         this.dom.mapModalTitle.textContent = translations.mapModalTitle;
         this.dom.gaodeMapBtn.textContent = translations.gaodeMap;

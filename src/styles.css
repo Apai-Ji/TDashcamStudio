@@ -824,6 +824,15 @@ body.dark-theme #eventFilter {
     object-fit: cover;
 }
 
+/* Next segment loading in the background, stacked under the visible player */
+.video-container video.standby-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .video-container.empty::after {
     content: '无信号';
     position: absolute;
