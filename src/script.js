@@ -10439,100 +10439,45 @@ class TeslaCamViewer {
             if (window.__TAURI__) {
                 // Tauri implementation
                 this.dom.clipProgressText.textContent = translations.exporting;
+                const isZh = this.currentLanguage === 'zh';
+                const savedPaths = [];
                 for (const result of results) {
-                    // Check if result is from FFmpeg (file path) or Canvas (blob)
+                    // FFmpeg already wrote the file into the export folder - nothing more to do
                     if (result.isFile && result.path) {
-                        const rawPath = result.path;
-                        const defaultFilename = rawPath.replace(/\\/g, '/').split('/').pop();
-                        const ext = defaultFilename.split('.').pop() || 'mp4';
-                        
-                        console.log('[Tauri Save] Finalizing export for:', defaultFilename, 'from temp:', rawPath);
-                        
-                        try {
-                            const tauri = window.__TAURI__;
-                            const invoke = tauri.core?.invoke || tauri.invoke;
-                            const fs = tauri.fs;
-                            const dialog = tauri.dialog;
-                            
-                            let savePath;
-                            if (dialog && typeof dialog.save === 'function') {
-                                console.log('[Tauri Save] Using dialog.save API');
-                                savePath = await dialog.save({
-                                    defaultPath: defaultFilename,
-                                    filters: [{
-                                        name: 'Video',
-                                        extensions: [ext]
-                                    }]
-                                });
-                            } else {
-                                console.log('[Tauri Save] Falling back to invoke plugin:dialog|save');
-                                savePath = await invoke('plugin:dialog|save', {
-                                    options: {
-                                        defaultPath: defaultFilename,
-                                        filters: [{
-                                            name: 'Video',
-                                            extensions: [ext]
-                                        }]
-                                    }
-                                });
-                            }
-                            
-                            const resolvedSavePath = typeof savePath === 'string' ? savePath : savePath?.path;
-                            if (resolvedSavePath && resolvedSavePath !== result.path) {
-                                // Copy file to new location
-                                await fs.copyFile(result.path, resolvedSavePath);
-                                // Remove temp file
-                                await fs.remove(result.path);
-                                this.showToast('保存成功!', 'success');
-                            } else if (resolvedSavePath === result.path) {
-                                this.showToast('保存成功!', 'success');
-                            } else {
-                                // User cancelled, keep the file in original location
-                                this.showToast(`视频已保存到: ${result.path}`, 'success');
-                            }
-                        } catch (e) {
-                            console.error('File move failed:', e);
-                            this.showToast(`视频已保存到: ${result.path}`, 'success');
-                        }
+                        savedPaths.push(result.path);
                     } else if (result.blob) {
-                        // Canvas export - blob needs to be saved
-                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                        const filename = `TeslaCam_${result.camera}_${timestamp}.webm`;
-                        
+                        // Canvas export - write the blob straight into the export folder
                         if (result.blob.size === 0) {
                             console.error('Invalid blob for camera:', result.camera);
                             alert('导出失败：生成的视频文件为空');
                             continue;
                         }
-                        
                         try {
-                            const invoke = window.__TAURI__.core?.invoke || window.__TAURI__.invoke;
-                            const fs = window.__TAURI__.fs;
-
-                            const savePath = await invoke('plugin:dialog|save', {
-                                options: {
-                                    defaultPath: filename,
-                                    filters: [{
-                                        name: 'Video',
-                                        extensions: ['webm']
-                                    }]
-                                }
-                            });
-                            
-                            const resolvedSavePath = typeof savePath === 'string' ? savePath : savePath?.path;
-                            if (resolvedSavePath) {
-                                const arrayBuffer = await result.blob.arrayBuffer();
-                                const uint8Array = new Uint8Array(arrayBuffer);
-                                
-                                // Tauri v2 uses writeFile
-                                await fs.writeFile(resolvedSavePath, uint8Array);
-                                this.showToast('保存成功!', 'success');
+                            const tauri = window.__TAURI__;
+                            const fs = tauri.fs;
+                            const cams = result.camera === 'grid' ? cameras : [result.camera];
+                            const sourceFile = segmentsWithDuration
+                                .flatMap(seg => cams.map(cam => seg.files?.[cam]))
+                                .find(file => file && file.path);
+                            let outputDir, pathSeparator;
+                            if (sourceFile || this.videoClipProcessor.exportDir) {
+                                ({ outputDir, pathSeparator } = this.videoClipProcessor.resolveOutputDir(sourceFile?.path || ''));
+                            } else {
+                                outputDir = (await tauri.path.downloadDir()).replace(/[\\/]+$/, '');
+                                pathSeparator = outputDir.includes('\\') ? '\\' : '/';
                             }
+                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                            const savePath = `${outputDir}${pathSeparator}TeslaCam_${result.camera}_${timestamp}.webm`;
+                            await fs.writeFile(savePath, new Uint8Array(await result.blob.arrayBuffer()));
+                            savedPaths.push(savePath);
                         } catch (e) {
                             console.error('Tauri save failed:', e);
                             alert('保存失败: ' + (e.message || e));
                         }
                     }
+                }
+                if (savedPaths.length > 0) {
+                    this.showToast(`${isZh ? '视频已保存到' : 'Saved to'}: ${savedPaths.join(', ')}`, 'success', 5000);
                 }
                 
                 this.dom.clipProgressText.textContent = translations.complete;
