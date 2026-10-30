@@ -444,6 +444,12 @@
                 <div class="clip-option-row" id="ffmpegOptionRow" style="margin-top: 8px; display: none;">
                      <label class="clip-checkbox-label" title="使用本地 FFmpeg 极速导出（需要系统已安装 FFmpeg）"><input type="checkbox" id="useLocalFFmpeg" checked> <span id="useLocalFFmpegLabel">使用 FFmpeg 极速导出</span></label>
                 </div>
+                <div class="clip-option-row" id="exportDirRow" style="margin-top: 8px; display: none; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <span id="exportDirLabel">导出目录:</span>
+                    <span id="exportDirPath" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8;"></span>
+                    <button type="button" id="chooseExportDirBtn" class="clip-nudge-btn">更改</button>
+                    <button type="button" id="resetExportDirBtn" class="clip-nudge-btn">恢复默认</button>
+                </div>
             </div>
             <div id="clipProgress" class="clip-progress" style="display: none;">
                 <div class="progress-bar">

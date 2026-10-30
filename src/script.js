@@ -4577,6 +4577,20 @@ class VideoClipProcessor {
         this.iconsLoaded = false;
         this.ffmpegChild = null;
         this.isCancelled = false;
+        // User-chosen export directory (null = same folder as source video)
+        this.exportDir = null;
+    }
+
+    // Resolve output directory: user setting first, otherwise the source file's folder
+    resolveOutputDir(sourcePath) {
+        if (this.exportDir) {
+            const sep = this.exportDir.includes('\\') ? '\\' : '/';
+            return { outputDir: this.exportDir.replace(/[\\/]+$/, ''), pathSeparator: sep };
+        }
+        const pathSeparator = sourcePath.includes('\\') ? '\\' : '/';
+        const lastSepIdx = sourcePath.lastIndexOf(pathSeparator);
+        const outputDir = lastSepIdx !== -1 ? sourcePath.substring(0, lastSepIdx) : '.';
+        return { outputDir, pathSeparator };
     }
 
     cancelExport() {
@@ -5511,9 +5525,7 @@ class VideoClipProcessor {
         if (!firstFile || !firstFile.path) throw new Error('File path not found');
         
         // Get directory path (handle both forward and back slashes)
-        const pathSeparator = firstFile.path.includes('\\') ? '\\' : '/';
-        const lastSepIdx = firstFile.path.lastIndexOf(pathSeparator);
-        const outputDir = lastSepIdx !== -1 ? firstFile.path.substring(0, lastSepIdx) : '.';
+        const { outputDir, pathSeparator } = this.resolveOutputDir(firstFile.path);
         
         // Use system temp directory for intermediate files
         let workDir = await getTempDir();
@@ -5761,9 +5773,7 @@ class VideoClipProcessor {
         const firstFile = clipSegments[0].segment.files[camera];
         if (!firstFile || !firstFile.path) throw new Error(`${camera} 摄像头文件路径未找到`);
         
-        const pathSeparator = firstFile.path.includes('\\') ? '\\' : '/';
-        const lastSepIdx = firstFile.path.lastIndexOf(pathSeparator);
-        const outputDir = lastSepIdx !== -1 ? firstFile.path.substring(0, lastSepIdx) : '.';
+        const { outputDir, pathSeparator } = this.resolveOutputDir(firstFile.path);
         
         // Use system temp directory for intermediate files
         let workDir = await getTempDir();
@@ -5931,7 +5941,7 @@ class VideoClipProcessor {
 
                 args = [
                     ...inputArgs,
-                    '-filter_complex_script', filterScriptPath,
+                    '-/filter_complex', filterScriptPath,
                     '-map', currentLabel,
                     '-map', '0:a?',
                     '-c:v', 'libx264',
@@ -6050,9 +6060,7 @@ class VideoClipProcessor {
         const firstFile = clipSegments.find(seg => seg.segment.files[activeCameras[0]] && seg.segment.files[activeCameras[0]].path)?.segment.files[activeCameras[0]];
         if (!firstFile) throw new Error('文件路径未找到');
         
-        const pathSeparator = firstFile.path.includes('\\') ? '\\' : '/';
-        const lastSepIdx = firstFile.path.lastIndexOf(pathSeparator);
-        const outputDir = lastSepIdx !== -1 ? firstFile.path.substring(0, lastSepIdx) : '.';
+        const { outputDir, pathSeparator } = this.resolveOutputDir(firstFile.path);
         
         // Use system temp directory for intermediate files
         let workDir = await getTempDir();
@@ -6313,7 +6321,7 @@ class VideoClipProcessor {
 
             const args = [
                 ...inputArgs,
-                '-filter_complex_script', filterScriptPath,
+                '-/filter_complex', filterScriptPath,
                 '-map', finalOutput,
                 '-map', '0:a?',
                 '-c:v', 'libx264',
@@ -8273,6 +8281,8 @@ class TeslaCamViewer {
         this.dom.closeClipModalBtn.addEventListener('click', () => this.hideClipModal());
         this.dom.cancelClipBtn.addEventListener('click', () => this.hideClipModal());
         this.dom.startClipBtn.addEventListener('click', () => this.startClipExport());
+        document.getElementById('chooseExportDirBtn')?.addEventListener('click', () => this.chooseExportDir());
+        document.getElementById('resetExportDirBtn')?.addEventListener('click', () => this.saveExportDir(null));
         this.dom.clipModal.addEventListener('click', (e) => {
             if (e.target === this.dom.clipModal) {
                 this.hideClipModal();
@@ -8573,7 +8583,7 @@ class TeslaCamViewer {
                 
                 if (hasTeslaCamSubfolders && validDirPath) {
                     // 保存路径到配置文件，供下次启动使用
-                    await this.saveTauriConfig({ lastTeslaCamPath: validDirPath });
+                    await this.saveTauriConfig({ ...((await this.loadTauriConfig()) || {}), lastTeslaCamPath: validDirPath });
                     console.log('[Tauri Drop] Saved path to config:', validDirPath);
                 }
                 
@@ -9387,6 +9397,65 @@ class TeslaCamViewer {
     }
 
     /**
+     * 读取导出目录设置并刷新导出弹窗中的显示
+     */
+    async loadExportDir() {
+        const config = await this.loadTauriConfig();
+        this.videoClipProcessor.exportDir = config?.exportDir || null;
+        this.updateExportDirUI();
+    }
+
+    updateExportDirUI() {
+        const isZh = this.currentLanguage === 'zh';
+        const dir = this.videoClipProcessor.exportDir;
+        const pathEl = document.getElementById('exportDirPath');
+        if (pathEl) {
+            pathEl.textContent = dir || (isZh ? '与源视频相同的文件夹（默认）' : 'Same folder as source video (default)');
+            pathEl.title = dir || '';
+        }
+        const label = document.getElementById('exportDirLabel');
+        if (label) label.textContent = isZh ? '导出目录:' : 'Export folder:';
+        const chooseBtn = document.getElementById('chooseExportDirBtn');
+        if (chooseBtn) chooseBtn.textContent = isZh ? '更改' : 'Change';
+        const resetBtn = document.getElementById('resetExportDirBtn');
+        if (resetBtn) {
+            resetBtn.textContent = isZh ? '恢复默认' : 'Reset';
+            resetBtn.style.display = dir ? '' : 'none';
+        }
+    }
+
+    async saveExportDir(dir) {
+        const config = (await this.loadTauriConfig()) || {};
+        if (dir) {
+            config.exportDir = dir;
+        } else {
+            delete config.exportDir;
+        }
+        await this.saveTauriConfig(config);
+        this.videoClipProcessor.exportDir = dir || null;
+        this.updateExportDirUI();
+    }
+
+    async chooseExportDir() {
+        const tauri = getTauri();
+        const dialog = tauri?.dialog || tauri?.api?.dialog;
+        if (!dialog || !dialog.open) return;
+        try {
+            const selected = await dialog.open({
+                directory: true,
+                multiple: false,
+                title: this.currentLanguage === 'zh' ? '选择导出目录' : 'Select Export Folder',
+                defaultPath: this.videoClipProcessor.exportDir || undefined
+            });
+            if (!selected) return;
+            await this.saveExportDir(typeof selected === 'string' ? selected : selected[0]);
+        } catch (e) {
+            console.error('[chooseExportDir] Error:', e);
+            this.showToast((this.currentLanguage === 'zh' ? '选择目录失败: ' : 'Failed to select folder: ') + e.message, 'error');
+        }
+    }
+
+    /**
      * 加载上次选择的 TeslaCam 目录
      */
     async loadLastTeslaCamPath() {
@@ -9651,7 +9720,7 @@ class TeslaCamViewer {
                 
                 if (hasTeslaCamSubfolders) {
                     // 保存路径到配置文件
-                    await this.saveTauriConfig({ lastTeslaCamPath: path });
+                    await this.saveTauriConfig({ ...((await this.loadTauriConfig()) || {}), lastTeslaCamPath: path });
                     console.log('[loadTauriDirectory] Saved path to config file');
                     
                     await this.handleFolderSelection(files);
@@ -10116,7 +10185,14 @@ class TeslaCamViewer {
         } else if (this.dom.ffmpegOptionRow) {
             this.dom.ffmpegOptionRow.style.display = 'none';
         }
-        
+
+        // Export directory setting (Tauri desktop only)
+        const exportDirRow = document.getElementById('exportDirRow');
+        if (exportDirRow) {
+            exportDirRow.style.display = this.isTauri ? 'flex' : 'none';
+            if (this.isTauri) this.loadExportDir();
+        }
+
         // Hide progress
         this.dom.clipProgress.style.display = 'none';
         this.dom.startClipBtn.disabled = false;
